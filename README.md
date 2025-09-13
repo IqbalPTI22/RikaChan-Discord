@@ -94,3 +94,9 @@ If you'd like to contribute, please feel free to `fork` this repository and subm
 ## 📜 License
 
 This project is licensed under the [MIT License](https://github.com/github/docs/blob/main/LICENSE).
+
+---
+
+## ✨ Acknowledgements
+
+The code for this bot was significantly improved and enhanced with the help of Replit's AI agent.
