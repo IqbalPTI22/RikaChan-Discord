@@ -1,7 +1,14 @@
 import discord
 from discord.ext import commands
 import os
-TOKEN = os.environ['TOKEN']
+import asyncio
+
+# Get Discord bot token from environment variable
+TOKEN = os.environ.get('TOKEN')
+if not TOKEN:
+    print("ERROR: TOKEN environment variable not found!")
+    print("Please set your Discord bot token using the TOKEN environment variable.")
+    exit(1)
 
 # Prefix untuk perintah bot, contoh: !setup
 # Kamu bisa ganti sesuai keinginanmu.
@@ -57,12 +64,15 @@ async def setup(ctx):
     try:
         # Menunggu konfirmasi dari user
         await bot.wait_for('message', check=check, timeout=30.0)
-    except TimeoutError:
+    except asyncio.TimeoutError:
         await ctx.send("Waktu habis. Proses pengaturan server dibatalkan.")
         return
 
     # Kirim pesan bahwa proses dimulai
     await ctx.send("Memulai proses pengaturan server...")
+    
+    # Simpan reference ke user untuk DM jika diperlukan
+    user = ctx.author
     
     # Hapus semua channel yang ada
     for channel in ctx.guild.channels:
@@ -74,6 +84,8 @@ async def setup(ctx):
             print(f"Terjadi kesalahan saat menghapus channel {channel.name}: {e}")
 
     # Buat kategori dan channel baru sesuai daftar di atas
+    announcements_channel = None
+    
     for category_name, channel_list in CHANNELS_TO_CREATE.items():
         try:
             # Buat kategori baru
@@ -83,7 +95,10 @@ async def setup(ctx):
             for channel_name in channel_list:
                 # Buat channel teks
                 if "voice-chat" not in channel_name:
-                    await category.create_text_channel(channel_name)
+                    new_channel = await category.create_text_channel(channel_name)
+                    # Simpan announcements channel untuk pesan status
+                    if "pengumuman" in channel_name:
+                        announcements_channel = new_channel
                 # Buat channel suara
                 else:
                     await category.create_voice_channel(channel_name)
@@ -91,14 +106,30 @@ async def setup(ctx):
             print(f"Kategori '{category_name}' dan channel-nya berhasil dibuat.")
 
         except discord.errors.Forbidden:
-            await ctx.send("Bot tidak memiliki izin untuk membuat channel atau kategori. Pastikan bot memiliki izin Administrator.")
+            # Gunakan DM jika tidak bisa kirim ke channel
+            try:
+                await user.send("Bot tidak memiliki izin untuk membuat channel atau kategori. Pastikan bot memiliki izin Administrator.")
+            except:
+                print("Tidak bisa mengirim pesan ke user karena DM tertutup.")
             return
         except Exception as e:
             print(f"Terjadi kesalahan saat membuat kategori {category_name}: {e}")
-            await ctx.send(f"Terjadi kesalahan: {e}")
+            # Gunakan DM jika tidak bisa kirim ke channel
+            try:
+                await user.send(f"Terjadi kesalahan: {e}")
+            except:
+                print(f"Tidak bisa mengirim pesan error ke user: {e}")
             return
 
-    await ctx.send("Server berhasil diatur! Selamat datang di server wibu yang rapi dan keren!")
+    # Kirim pesan sukses ke announcements channel atau DM
+    success_message = "Server berhasil diatur! Selamat datang di server wibu yang rapi dan keren!"
+    if announcements_channel:
+        await announcements_channel.send(success_message)
+    else:
+        try:
+            await user.send(success_message)
+        except:
+            print("Setup selesai, tapi tidak bisa mengirim konfirmasi ke user.")
 
 # Jalankan bot
 bot.run(TOKEN)
